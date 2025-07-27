@@ -12,6 +12,7 @@ use std::path::Path;
 use clap::Parser;
 use rpassword::read_password;
 use std::fmt::Display;
+use chrono::{Local, NaiveDate};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -20,7 +21,7 @@ struct Args {
     #[arg(short, long)]
     keytype: String,
 
-    /// Algorith [RSA, ED25519]
+    /// Algorithm [RSA, ED25519]
     #[arg(short, long, default_value_t = String::from("RSA"))]
     algorithm: String,
 }
@@ -76,7 +77,12 @@ fn print_fingerprint_art<P: Display + AsRef<Path>>(path: P) -> OsshResult<()> {
 }
 
 fn main() -> OsshResult<()> {
+    // Parse args from command line
     let args = Args::parse();
+    // Get today's date
+    let now_local = Local::now();
+    let today_naive_date: NaiveDate = now_local.date_naive();
+
     let mut password;
     let mut p_second;
     loop {
@@ -87,8 +93,10 @@ fn main() -> OsshResult<()> {
             break;
         }
     }
-    
-    let filename = &args.keytype;
+    let filename = &args.keytype;    
+    let today = today_naive_date.to_string();
+    let merged = format!("{filename}-{today}");
+    println!("{merged}");
 
     // Generate a keypair
     let keypair;
@@ -108,7 +116,7 @@ fn main() -> OsshResult<()> {
         }
     }
 
-    let mut f = fop.open(filename)?;
+    let mut f = fop.open(&merged)?;
     // Serialize the private key and write it
     f.write_all(
         keypair
@@ -120,7 +128,7 @@ fn main() -> OsshResult<()> {
 
     // Get the serialized public key
     let pubkey = keypair.serialize_publickey()?;
-    let f = format!("{}.pub", filename);
+    let f = format!("{}.pub", merged);
 
 
     // Create public key file
@@ -128,7 +136,7 @@ fn main() -> OsshResult<()> {
         .write(true)
         .create(true)
         .truncate(true)
-        .open(Path::new(filename).with_extension("pub"))?;
+        .open(Path::new(&merged).with_extension("pub"))?;
     // Write the public key
     writeln!(pubf, "{}", &pubkey)?;
     pubf.sync_all()?;
