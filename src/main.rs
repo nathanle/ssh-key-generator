@@ -40,7 +40,7 @@ fn print_fingerprint<P: Display + AsRef<Path>>(path: P) -> OsshResult<()> {
     match fs::read_to_string(path) {
         Ok(s) => {
             let pubkey = PublicKey::from_keystr(&s)?;
-            let mut hs = hex::encode_upper(pubkey.fingerprint(FingerprintHash::SHA256)?);
+            let hs = hex::encode_upper(pubkey.fingerprint(FingerprintHash::SHA256)?);
             let mut result = String::new();
             for (i, c) in hs.chars().enumerate() {
                 result.push(c);
@@ -74,10 +74,11 @@ fn print_fingerprint_art<P: Display + AsRef<Path>>(path: P) -> OsshResult<()> {
     }
     Ok(())
 }
+
 fn main() -> OsshResult<()> {
     let args = Args::parse();
-    let mut password = String::from("none");
-    let mut p_second = String::from("none");
+    let mut password;
+    let mut p_second;
     loop {
         (password, p_second) = get_passwords();
         if password != p_second {
