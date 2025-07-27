@@ -18,15 +18,11 @@ use std::fmt::Display;
 struct Args {
     /// Type [internal, external, deployed]
     #[arg(short, long)]
-    k: String,
+    keytype: String,
 
-    /// Algorithm
+    /// Algorith [RSA, ED25519]
     #[arg(short, long, default_value_t = String::from("RSA"))]
-    a: String,
-
-    /// Bits
-    #[arg(short, long, default_value_t = 2048)]
-    b: usize,
+    algorithm: String,
 }
 
 fn get_passwords() -> (String, String) {
@@ -79,6 +75,7 @@ fn print_fingerprint_art<P: Display + AsRef<Path>>(path: P) -> OsshResult<()> {
     Ok(())
 }
 fn main() -> OsshResult<()> {
+    let args = Args::parse();
     let mut password = String::from("none");
     let mut p_second = String::from("none");
     loop {
@@ -89,16 +86,15 @@ fn main() -> OsshResult<()> {
             break;
         }
     }
-    let args = Args::parse();
     
-    let filename = &args.k;
+    let filename = &args.keytype;
 
     // Generate a keypair
     let keypair;
-    if args.a == "RSA" {
-        keypair = KeyPair::generate(KeyType::RSA, args.b)?;
-    } else if args.a == "ED25519" {
-        keypair = KeyPair::generate(KeyType::ED25519, args.b)?;
+    if args.algorithm == "RSA" {
+        keypair = KeyPair::generate(KeyType::RSA, 2048)?;
+    } else if args.algorithm == "ED25519" {
+        keypair = KeyPair::generate(KeyType::ED25519, 256)?;
     } else {
         panic!("Invalid algorithm!")
     }
@@ -124,8 +120,6 @@ fn main() -> OsshResult<()> {
     // Get the serialized public key
     let pubkey = keypair.serialize_publickey()?;
     let f = format!("{}.pub", filename);
-    let _ = print_fingerprint(&f)?;
-    let _ = print_fingerprint_art(&f)?;
 
 
     // Create public key file
@@ -138,6 +132,8 @@ fn main() -> OsshResult<()> {
     writeln!(pubf, "{}", &pubkey)?;
     pubf.sync_all()?;
 
+    let _ = print_fingerprint(&f)?;
+    let _ = print_fingerprint_art(&f)?;
     // Print it out
     println!("{}", &pubkey);
     Ok(())
