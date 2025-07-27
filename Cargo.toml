@@ -1,0 +1,11 @@
+[package]
+name = "ssh-key-generator"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cfg-if = "1.0.1"
+clap = { version = "4.5.41", features = ["derive"] }
+hex = "0.4.3"
+osshkeys = "0.7.0"
+rpassword = "7.4.0"
