@@ -25,7 +25,7 @@ struct Args {
     #[arg(short, long, default_value_t = String::from("RSA"))]
     algorithm: String,
 }
-
+// Ask for the password twice and make sure it matches.
 fn get_passwords() -> (String, String) {
     print!("Enter password: ");
     io::stdout().flush().unwrap();
@@ -36,6 +36,7 @@ fn get_passwords() -> (String, String) {
     return (password, password_second);
 }
 
+// Print the fingerprint and add ":" as a delimiter
 fn print_fingerprint<P: Display + AsRef<Path>>(path: P) -> OsshResult<()> {
     print!("{}: ", path);
     match fs::read_to_string(path) {
@@ -60,6 +61,7 @@ fn print_fingerprint<P: Display + AsRef<Path>>(path: P) -> OsshResult<()> {
     }
     Ok(())
 }
+//Print the ASCII art for fingerprint
 fn print_fingerprint_art<P: Display + AsRef<Path>>(path: P) -> OsshResult<()> {
     match fs::read_to_string(path) {
         Ok(s) => {
@@ -141,9 +143,9 @@ fn main() -> OsshResult<()> {
     writeln!(pubf, "{}", &pubkey)?;
     pubf.sync_all()?;
 
+    // Display fingerprint, art, and pubkey
     let _ = print_fingerprint(&f)?;
     let _ = print_fingerprint_art(&f)?;
-    // Print it out
     println!("{}", &pubkey);
     Ok(())
 }
