@@ -111,8 +111,8 @@ fn main() -> OsshResult<()> {
     // Serialize the private key and write it
     f.write_all(
         keypair
-            //.serialize_openssh(Some(&password), Cipher::Aes256_Ctr)?
-            .serialize_pkcs8(Some(""))?
+            .serialize_openssh(Some(&password), Cipher::Aes256_Ctr)?
+            //.serialize_pkcs8(Some(&password))?
             .as_bytes(),
     )?;
     f.sync_all()?;
