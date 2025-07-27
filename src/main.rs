@@ -8,7 +8,7 @@ use std::fs;
 use std::io::{self, Write};
 #[cfg(unix)]
 use std::os::unix::fs::*;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use clap::Parser;
 use rpassword::read_password;
 use std::fmt::Display;
@@ -110,6 +110,13 @@ fn main() -> OsshResult<()> {
         panic!("Invalid algorithm!")
     }
     // Create the file with permission 0600
+    let mut directory = format!("~/.ssh/{}", filename);
+    let expanded_path = shellexpand::tilde(&directory);
+    let path_buf: PathBuf = expanded_path.into_owned().into();
+    let path = format!("{}/{}", &path_buf.display(), merged);
+    println!("{}", path_buf.display());
+    println!("{path}");
+    let _createdir = fs::create_dir(path_buf).expect("Something is wrong!");
     let mut fop = fs::OpenOptions::new();
     fop.write(true).create(true).truncate(true);
     cfg_if! {
@@ -118,7 +125,7 @@ fn main() -> OsshResult<()> {
         }
     }
 
-    let mut f = fop.open(&merged)?;
+    let mut f = fop.open(&path)?;
     // Serialize the private key and write it
     f.write_all(
         keypair
@@ -130,7 +137,7 @@ fn main() -> OsshResult<()> {
 
     // Get the serialized public key
     let pubkey = keypair.serialize_publickey()?;
-    let f = format!("{}.pub", merged);
+    let f = format!("{}.pub", path);
 
 
     // Create public key file
@@ -138,7 +145,7 @@ fn main() -> OsshResult<()> {
         .write(true)
         .create(true)
         .truncate(true)
-        .open(Path::new(&merged).with_extension("pub"))?;
+        .open(Path::new(&path).with_extension("pub"))?;
     // Write the public key
     writeln!(pubf, "{}", &pubkey)?;
     pubf.sync_all()?;
