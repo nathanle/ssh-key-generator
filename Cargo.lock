@@ -399,6 +399,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "emoji-printer"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "13a6505d5c2961f89aa1f95c1691aadd791e7667595a1502a15038c9e8fa3ef8"
+dependencies = [
+ "regex",
+]
+
+[[package]]
 name = "fiat-crypto"
 version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -924,6 +933,7 @@ dependencies = [
  "cfg-if",
  "chrono",
  "clap",
+ "emoji-printer",
  "hex",
  "osshkeys",
  "rpassword",

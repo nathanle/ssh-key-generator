@@ -13,6 +13,7 @@ use clap::Parser;
 use rpassword::read_password;
 use std::fmt::Display;
 use chrono::{Local, NaiveDate};
+use emoji_printer::print_emojis;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -57,7 +58,7 @@ fn print_fingerprint<P: Display + AsRef<Path>>(path: P) -> OsshResult<()> {
             //Show the fingerprint in SHA256)
             let fp = sshkeys::Fingerprint::compute(sshkeys::FingerprintKind::Sha256, &s);
             println!(
-                "SHA256:{}",
+                "SHA256 fingerprint: {}",
                 fp.hash
             );
         }
@@ -105,7 +106,6 @@ fn main() -> OsshResult<()> {
     let today = today_naive_date.to_string();
     let username = whoami::username();
     let merged = format!("{username}-{filename}-{today}");
-    println!("{merged}");
 
     // Generate a keypair
     let keypair;
@@ -121,8 +121,7 @@ fn main() -> OsshResult<()> {
     let expanded_path = shellexpand::tilde(&directory);
     let path_buf: PathBuf = expanded_path.into_owned().into();
     let path = format!("{}/{}", &path_buf.display(), merged);
-    println!("{}", path_buf.display());
-    println!("{path}");
+    println!("{}: {}", print_emojis(":locked_with_key:"), path);
     let _createdir = fs::create_dir(path_buf);
     let mut fop = fs::OpenOptions::new();
     fop.write(true).create(true).truncate(true);
