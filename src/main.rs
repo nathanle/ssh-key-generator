@@ -159,6 +159,7 @@ fn main() -> OsshResult<()> {
     // Display fingerprint, art, and pubkey
     let _ = print_fingerprint(&f)?;
     let _ = print_fingerprint_art(&f)?;
+    println!("{} Public key:", print_emojis(":locked_with_pen:"));
     println!("{}", &pubkey);
     Ok(())
 }
