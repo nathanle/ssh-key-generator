@@ -38,7 +38,6 @@ fn get_passwords() -> (String, String) {
 
 // Print the fingerprint and add ":" as a delimiter
 fn print_fingerprint<P: Display + AsRef<Path>>(path: P) -> OsshResult<()> {
-    print!("{}: ", path);
     match fs::read_to_string(path) {
         Ok(s) => {
             let pubkey = PublicKey::from_keystr(&s)?;
@@ -50,9 +49,16 @@ fn print_fingerprint<P: Display + AsRef<Path>>(path: P) -> OsshResult<()> {
                     result.push_str(":");
                 }
             }
+            //Show the fingerprint in SHA256 hex
+            println!(
+                "SHA256 (HEX):{}",
+                result
+            );
+            //Show the fingerprint in SHA256)
+            let fp = sshkeys::Fingerprint::compute(sshkeys::FingerprintKind::Sha256, &s);
             println!(
                 "SHA256:{}",
-                result
+                fp.hash
             );
         }
         Err(e) => {
@@ -97,7 +103,8 @@ fn main() -> OsshResult<()> {
     }
     let filename = &args.keytype;    
     let today = today_naive_date.to_string();
-    let merged = format!("{filename}-{today}");
+    let username = whoami::username();
+    let merged = format!("{username}-{filename}-{today}");
     println!("{merged}");
 
     // Generate a keypair
@@ -110,13 +117,13 @@ fn main() -> OsshResult<()> {
         panic!("Invalid algorithm!")
     }
     // Create the file with permission 0600
-    let mut directory = format!("~/.ssh/{}", filename);
+    let directory = format!("~/.ssh/{}", filename);
     let expanded_path = shellexpand::tilde(&directory);
     let path_buf: PathBuf = expanded_path.into_owned().into();
     let path = format!("{}/{}", &path_buf.display(), merged);
     println!("{}", path_buf.display());
     println!("{path}");
-    let _createdir = fs::create_dir(path_buf).expect("Something is wrong!");
+    let _createdir = fs::create_dir(path_buf);
     let mut fop = fs::OpenOptions::new();
     fop.write(true).create(true).truncate(true);
     cfg_if! {
