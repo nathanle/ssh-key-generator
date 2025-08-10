@@ -109,9 +109,9 @@ fn main() -> OsshResult<()> {
 
     // Generate a keypair
     let keypair;
-    if args.algorithm == "RSA" {
+    if args.algorithm.to_lowercase() == "rsa" {
         keypair = KeyPair::generate(KeyType::RSA, 2048)?;
-    } else if args.algorithm == "ED25519" {
+    } else if args.algorithm.to_lowercase() == "ed25519" {
         keypair = KeyPair::generate(KeyType::ED25519, 256)?;
     } else {
         panic!("Invalid algorithm!")
