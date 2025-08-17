@@ -16,6 +16,7 @@ use chrono::{Local, NaiveDate};
 use emoji_printer::print_emojis;
 use ssh::*;
 
+
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
@@ -38,6 +39,7 @@ fn get_passwords() -> (String, String) {
     return (password, password_second);
 }
 
+#Adding SSH suport for key deployment
 fn write_ssh(host: &str, port: usize) {
     let mut session=Session::new().unwrap();
     session.set_host(host).unwrap();
