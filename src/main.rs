@@ -14,6 +14,7 @@ use rpassword::read_password;
 use std::fmt::Display;
 use chrono::{Local, NaiveDate};
 use emoji_printer::print_emojis;
+use ssh::*;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -35,6 +36,23 @@ fn get_passwords() -> (String, String) {
     io::stdout().flush().unwrap();
     let password_second = read_password().unwrap();
     return (password, password_second);
+}
+
+fn write_ssh(host: &str, port: usize) {
+    let mut session=Session::new().unwrap();
+    session.set_host(host).unwrap();
+    session.set_port(port).unwrap();
+    session.parse_config(None).unwrap();
+    session.connect().unwrap();
+    println!("{:?}",session.is_server_known());
+    session.userauth_publickey_auto(None).unwrap();
+    {
+        let mut scp=session.scp_new(WRITE,"/tmp").unwrap();
+        scp.init().unwrap();
+        let buf=b"blabla blibli\n".to_vec();
+        scp.push_file("blublu",buf.len(),0o644).unwrap();
+        scp.write(&buf).unwrap();
+    }
 }
 
 // Print the fingerprint and add ":" as a delimiter
