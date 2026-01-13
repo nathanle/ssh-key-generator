@@ -147,14 +147,18 @@ fn main() -> OsshResult<()> {
 
 
     // Create public key file
-    let mut pubf = fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(Path::new(&path).with_extension("pub"))?;
+    let mut pubf = fs::OpenOptions::new();
+    pubf.write(true).create(true).truncate(true);
+    cfg_if! {
+        if #[cfg(unix)] {
+            pubf.mode(0o600);
+        }
+    }
+
+    let mut pub_file = pubf.open(Path::new(&path).with_extension("pub"))?;
     // Write the public key
-    writeln!(pubf, "{}", &pubkey)?;
-    pubf.sync_all()?;
+    writeln!(pub_file, "{}", &pubkey)?;
+    pub_file.sync_all()?;
 
     // Display fingerprint, art, and pubkey
     let _ = print_fingerprint(&f)?;
