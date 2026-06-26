@@ -14,6 +14,9 @@ use rpassword::read_password;
 use std::fmt::Display;
 use chrono::{Local, NaiveDate};
 use emoji_printer::print_emojis;
+use std::io::prelude::*;
+use std::net::TcpStream;
+use ssh2::Session;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -82,6 +85,52 @@ fn print_fingerprint_art<P: Display + AsRef<Path>>(path: P) -> OsshResult<()> {
             println!("{}", e);
         }
     }
+    Ok(())
+}
+
+fn copy_key(ip_addr: &str, public_key: &str) -> Result<(), Box<dyn std::error::Error>> {
+    // 1. Connect to the remote server over TCP
+    let tcp = TcpStream::connect(format!("{}:2201", ip_addr))?;
+    let mut sess = Session::new()?;
+    sess.set_tcp_stream(tcp);
+    sess.handshake()?;
+
+    print!("Enter username: ");
+    io::stdout().flush().unwrap();
+    let mut username = String::new();
+    io::stdin().read_line(&mut username)?;
+    print!("Enter password: ");
+    io::stdout().flush().unwrap();
+    let password = read_password().unwrap();
+    // 2. Authenticate using the remote password
+    sess.userauth_password(&username.trim(), &password)?;
+    if !sess.authenticated() {
+        return Err("Authentication failed".into());
+    }
+
+    // 3. Open a channel to execute commands
+    let mut channel = sess.channel_session()?;
+    
+    // Define the public key string you want to copy
+    //let public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... user@local";
+
+    // 4. Mimic ssh-copy-id logic: create directory, append key, and fix permissions
+    let cmd = format!(
+        "mkdir -p ~/.ssh && \
+         chmod 700 ~/.ssh && \
+         echo '{}' >> ~/.ssh/authorized_keys && \
+         chmod 600 ~/.ssh/authorized_keys",
+        public_key
+    );
+
+    channel.exec(&cmd)?;
+    
+    // Read the output (optional validation)
+    let mut output = String::new();
+    channel.read_to_string(&mut output)?;
+    channel.wait_close()?;
+
+    println!("Public key successfully appended to remote host.");
     Ok(())
 }
 
@@ -165,5 +214,11 @@ fn main() -> OsshResult<()> {
     let _ = print_fingerprint_art(&f)?;
     println!("{} Public key:", print_emojis(":locked_with_pen:"));
     println!("{}", &pubkey);
+    println!("Copying key to host...");
+    let _  = copy_key("192.168.0.4", &pubkey);
+    let _  = copy_key("192.168.0.5", &pubkey);
+    let _  = copy_key("192.168.0.6", &pubkey);
+    let _  = copy_key("192.168.0.8", &pubkey);
+    //println!("{:?}", result);
     Ok(())
 }
