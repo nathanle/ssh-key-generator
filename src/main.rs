@@ -30,6 +30,10 @@ struct Args {
     /// Algorithm [RSA, ED25519]
     #[arg(short, long, default_value_t = String::from("RSA"))]
     algorithm: String,
+
+    /// Copy to systems using config.toml Default is FALSE 
+    #[arg(short, long, action=clap::ArgAction::SetTrue)]
+    copy_key: bool, 
 }
 // Ask for the password twice and make sure it matches.
 fn get_passwords() -> (String, String) {
@@ -136,9 +140,10 @@ fn copy_key(public_key: &str) -> Result<(), Box<dyn std::error::Error>> {
         let cmd = format!(
             "mkdir -p ~/.ssh && \
             chmod 700 ~/.ssh && \
+            sed -i '/ssh-rust-{}/d' ~/.ssh/authorized_keys && \
             echo '{} ssh-rust-{}' >> ~/.ssh/authorized_keys && \
             chmod 600 ~/.ssh/authorized_keys",
-            public_key, gethostname().to_string_lossy() 
+            gethostname().to_string_lossy(), public_key, gethostname().to_string_lossy() 
         );
 
         channel.exec(&cmd)?;
@@ -233,8 +238,10 @@ fn main() -> OsshResult<()> {
     let _ = print_fingerprint_art(&f)?;
     println!("{} Public key:", print_emojis(":locked_with_pen:"));
     println!("{}", &pubkey);
-    println!("Copying key to host...");
-    let _  = copy_key(&pubkey);
+    if args.copy_key {
+        println!("Copying key to host...");
+        let _  = copy_key(&pubkey);
+    }
     //println!("{:?}", result);
     Ok(())
 }

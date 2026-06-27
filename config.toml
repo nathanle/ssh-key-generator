@@ -1,12 +1,31 @@
-user = "username"
+user = "nathan"
 
 [[servers]]
 name = "Beta"
 ip = "192.168.0.4"
-port = 2211
-...
+port = 2201
+
 [[servers]]
 name = "Alpha"
 ip = "192.168.0.5"
-port = 2211
+port = 2201
 
+[[servers]]
+name = "Gamma"
+ip = "192.168.0.6"
+port = 2201
+
+[[servers]]
+name = "bigben"
+ip = "192.168.0.8"
+port = 2201
+
+[[servers]]
+name = "fireball"
+ip = "192.168.0.79"
+port = 2201
+
+[[servers]]
+name = "jetson"
+ip = "192.168.0.14"
+port = 22
