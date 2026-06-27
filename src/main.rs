@@ -17,6 +17,8 @@ use emoji_printer::print_emojis;
 use std::io::prelude::*;
 use std::net::TcpStream;
 use ssh2::Session;
+use serde::Deserialize;
+use gethostname::gethostname;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -88,53 +90,70 @@ fn print_fingerprint_art<P: Display + AsRef<Path>>(path: P) -> OsshResult<()> {
     Ok(())
 }
 
-fn copy_key(ip_addr: &str, public_key: &str) -> Result<(), Box<dyn std::error::Error>> {
-    // 1. Connect to the remote server over TCP
-    let tcp = TcpStream::connect(format!("{}:2201", ip_addr))?;
-    let mut sess = Session::new()?;
-    sess.set_tcp_stream(tcp);
-    sess.handshake()?;
-
-    print!("Enter username: ");
-    io::stdout().flush().unwrap();
-    let mut username = String::new();
-    io::stdin().read_line(&mut username)?;
-    print!("Enter password: ");
-    io::stdout().flush().unwrap();
-    let password = read_password().unwrap();
-    // 2. Authenticate using the remote password
-    sess.userauth_password(&username.trim(), &password)?;
-    if !sess.authenticated() {
-        return Err("Authentication failed".into());
+fn copy_key(public_key: &str) -> Result<(), Box<dyn std::error::Error>> {
+    #[derive(Debug, Deserialize)]
+    struct Config {
+        user: String,    
+        servers: Vec<Server>,  
     }
 
-    // 3. Open a channel to execute commands
-    let mut channel = sess.channel_session()?;
-    
-    // Define the public key string you want to copy
-    //let public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... user@local";
+    #[derive(Debug, Deserialize)]
+    struct Server {
+        name: String,
+        ip: String,
+        port: u32,
+    }
 
-    // 4. Mimic ssh-copy-id logic: create directory, append key, and fix permissions
-    let cmd = format!(
-        "mkdir -p ~/.ssh && \
-         chmod 700 ~/.ssh && \
-         echo '{}' >> ~/.ssh/authorized_keys && \
-         chmod 600 ~/.ssh/authorized_keys",
-        public_key
-    );
 
-    channel.exec(&cmd)?;
-    
-    // Read the output (optional validation)
-    let mut output = String::new();
-    channel.read_to_string(&mut output)?;
-    channel.wait_close()?;
+    let config_content = fs::read_to_string("config.toml")?;
+    let config: Config = toml::from_str(&config_content)?;
 
-    println!("Public key successfully appended to remote host.");
+    print!("Enter password for systems: ");
+    io::stdout().flush().unwrap();
+    let password = read_password().unwrap();
+
+    for server in config.servers {
+        let result = TcpStream::connect(format!("{}:{}", server.ip, server.port));
+        let tcp = match result {
+            Ok(result) => result, 
+            Err(e) => {
+                eprintln!("{}: {}", server.name, e);
+                continue;
+            }
+        };
+        let mut sess = Session::new()?;
+        sess.set_tcp_stream(tcp);
+        sess.handshake()?;
+
+
+        sess.userauth_password(&config.user, &password)?;
+        if !sess.authenticated() {
+            return Err("Authentication failed".into());
+        }
+
+        let mut channel = sess.channel_session()?;
+        
+        let cmd = format!(
+            "mkdir -p ~/.ssh && \
+            chmod 700 ~/.ssh && \
+            echo '{} ssh-rust-{}' >> ~/.ssh/authorized_keys && \
+            chmod 600 ~/.ssh/authorized_keys",
+            public_key, gethostname().to_string_lossy() 
+        );
+
+        channel.exec(&cmd)?;
+        
+        let mut output = String::new();
+        channel.read_to_string(&mut output)?;
+        channel.wait_close()?;
+
+        println!("Public key successfully appended to remote host: {}.", server.name);
+    }
     Ok(())
 }
 
 fn main() -> OsshResult<()> {
+
     // Parse args from command line
     let args = Args::parse();
     // Get today's date
@@ -215,10 +234,7 @@ fn main() -> OsshResult<()> {
     println!("{} Public key:", print_emojis(":locked_with_pen:"));
     println!("{}", &pubkey);
     println!("Copying key to host...");
-    let _  = copy_key("192.168.0.4", &pubkey);
-    let _  = copy_key("192.168.0.5", &pubkey);
-    let _  = copy_key("192.168.0.6", &pubkey);
-    let _  = copy_key("192.168.0.8", &pubkey);
+    let _  = copy_key(&pubkey);
     //println!("{:?}", result);
     Ok(())
 }
