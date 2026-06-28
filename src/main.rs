@@ -4,7 +4,7 @@ extern crate cfg_if;
 use osshkeys::error::OsshResult;
 use osshkeys::{cipher::Cipher, KeyPair, KeyType, PublicKey, PublicParts};
 use osshkeys::keys::FingerprintHash;
-use std::fs;
+use std::{ env, fs, process };
 use std::io::{self, Write};
 #[cfg(unix)]
 use std::os::unix::fs::*;
@@ -19,12 +19,18 @@ use std::net::TcpStream;
 use ssh2::Session;
 use serde::Deserialize;
 use gethostname::gethostname;
+use aes_gcm::{
+    aead::{Aead, AeadCore, KeyInit, OsRng},
+    Aes256Gcm, Nonce, Key
+};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
+
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
     /// Type [internal, external, deployed]
-    #[arg(short, long)]
+    #[arg(short, long, default_value_t = String::from("rust-ssh"))]
     keytype: String,
 
     /// Algorithm [RSA, ED25519]
@@ -34,6 +40,10 @@ struct Args {
     /// Copy to systems using config.toml Default is FALSE 
     #[arg(short, long, action=clap::ArgAction::SetTrue)]
     copy_key: bool, 
+
+    /// Generate encrypted password for use in the config file 
+    #[arg(short, long, action=clap::ArgAction::SetTrue)]
+    provide_encrypted_password: bool, 
 }
 // Ask for the password twice and make sure it matches.
 fn get_passwords() -> (String, String) {
@@ -45,6 +55,64 @@ fn get_passwords() -> (String, String) {
     let password_second = read_password().unwrap();
     return (password, password_second);
 }
+
+fn encrypt_password() -> Result<(), Box<dyn std::error::Error>> {
+    let mut password;
+    let mut p_second;
+    loop {
+        (password, p_second) = get_passwords();
+        if password != p_second {
+            println!("Passwords do not match. Try again")
+        } else {
+            break;
+        }
+    }
+    let key = "ENCRYPTION_KEY";
+    
+    let encrypt_key = match env::var(key) {
+        Ok(value) => value,
+        Err(e) => {
+            eprintln!("{}", e);
+            panic!("Provide ENCRYPTION_KEY env var");
+        }
+    };
+
+    let key = Aes256Gcm::generate_key(&mut OsRng);
+    let cipher = Aes256Gcm::new(&key);
+    let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+    let ciphertext_bytes = cipher
+        .encrypt(&nonce, password.as_bytes())
+        .map_err(|e| format!("Encryption failed: {:?}", e))?;
+    let encrypted_base64 = STANDARD.encode(&ciphertext_bytes);
+
+    //println!("Key:  {}", key);
+    println!("Encrypted: {}", encrypted_base64);
+
+    print!("Enter base64 encoded string: ");
+    io::stdout().flush().unwrap();
+    let bas64_enc = read_password().unwrap();
+    let decrypted_bytes = cipher 
+        .decrypt(&nonce, STANDARD.decode(&encrypted_base64).unwrap().as_slice())
+        .map_err(|e| format!("Decryption failed: {:?}", e))?;
+    
+    let decrypted_string = String::from_utf8(decrypted_bytes)?;
+    println!("Decrypted: {}", decrypted_string);
+
+
+
+
+    //let encrypted = encrypt_bytes(password.trim_end().as_bytes(), encrypt_key.trim_end().as_bytes()).expect("Failed to encrypt");
+    //println!("{}", String::from_utf8(encrypted).expect("Weird"));
+    //match String::from_utf8(encrypted) {
+    //   Ok(string) => println!("{}", string),
+    //    Err(e) => println!("Error: {}", e),
+    //}
+
+    Ok(())
+
+}
+
+
 
 // Print the fingerprint and add ":" as a delimiter
 fn print_fingerprint<P: Display + AsRef<Path>>(path: P) -> OsshResult<()> {
@@ -64,7 +132,7 @@ fn print_fingerprint<P: Display + AsRef<Path>>(path: P) -> OsshResult<()> {
                 "SHA256 (HEX):{}",
                 result
             );
-            //Show the fingerprint in SHA256)
+            //Show the fingerprint in SHA256
             let fp = sshkeys::Fingerprint::compute(sshkeys::FingerprintKind::Sha256, &s);
             println!(
                 "SHA256 fingerprint: {}",
@@ -107,7 +175,6 @@ fn copy_key(public_key: &str) -> Result<(), Box<dyn std::error::Error>> {
         ip: String,
         port: u32,
     }
-
 
     let config_content = fs::read_to_string("config.toml")?;
     let config: Config = toml::from_str(&config_content)?;
@@ -164,6 +231,11 @@ fn main() -> OsshResult<()> {
     // Get today's date
     let now_local = Local::now();
     let today_naive_date: NaiveDate = now_local.date_naive();
+    if args.provide_encrypted_password {
+        let _ = encrypt_password();
+        process::ExitCode::SUCCESS;
+        process::exit(1)
+    }
 
     let mut password;
     let mut p_second;
@@ -242,6 +314,5 @@ fn main() -> OsshResult<()> {
         println!("Copying key to host...");
         let _  = copy_key(&pubkey);
     }
-    //println!("{:?}", result);
     Ok(())
 }
