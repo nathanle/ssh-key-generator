@@ -20,7 +20,7 @@ use ssh2::Session;
 use serde::Deserialize;
 use gethostname::gethostname;
 use aes_gcm::{
-    aead::{Aead, AeadCore, KeyInit, OsRng},
+    aead::{generic_array::GenericArray, Aead, AeadCore, KeyInit, OsRng},
     Aes256Gcm, Nonce, Key
 };
 use base64::{engine::general_purpose::STANDARD, Engine as _};
@@ -56,6 +56,37 @@ fn get_passwords() -> (String, String) {
     return (password, password_second);
 }
 
+fn decrypt_password() -> Result<(), Box<dyn std::error::Error>> {
+    //Cleanup var names here...
+    print!("Enter key: ");
+    io::stdout().flush().unwrap();
+    let dkey = read_password().unwrap();
+    let decoded_key = STANDARD.decode(&dkey).unwrap();
+    let new = GenericArray::from_slice(&decoded_key);
+    let dcipher = Aes256Gcm::new(&new);
+
+    print!("Enter nonce: ");
+    io::stdout().flush().unwrap();
+    let nnonce = read_password().unwrap();
+    let decoded_nonce = STANDARD.decode(&nnonce).unwrap();
+    let nonce = GenericArray::from_slice(&decoded_nonce);
+
+    print!("Enter base64 encoded string: ");
+    io::stdout().flush().unwrap();
+    let base64_enc = read_password().unwrap();
+    let decoded_payload = STANDARD.decode(&base64_enc).unwrap();
+    
+    let decrypted_bytes = dcipher 
+        .decrypt(&nonce, decoded_payload.as_slice())
+        .map_err(|e| format!("Decryption failed: {:?}", e))?;
+    
+    let decrypted_string = String::from_utf8(decrypted_bytes).unwrap();
+    println!("Decrypted: {}", decrypted_string);
+
+    Ok(())
+
+}
+
 fn encrypt_password() -> Result<(), Box<dyn std::error::Error>> {
     let mut password;
     let mut p_second;
@@ -67,15 +98,15 @@ fn encrypt_password() -> Result<(), Box<dyn std::error::Error>> {
             break;
         }
     }
-    let key = "ENCRYPTION_KEY";
+    //let key = "ENCRYPTION_KEY";
     
-    let encrypt_key = match env::var(key) {
-        Ok(value) => value,
-        Err(e) => {
-            eprintln!("{}", e);
-            panic!("Provide ENCRYPTION_KEY env var");
-        }
-    };
+    //let encrypt_key = match env::var(key) {
+    //    Ok(value) => value,
+    //    Err(e) => {
+    //        eprintln!("{}", e);
+    //        panic!("Provide ENCRYPTION_KEY env var");
+    //    }
+    //};
 
     let key = Aes256Gcm::generate_key(&mut OsRng);
     let cipher = Aes256Gcm::new(&key);
@@ -85,28 +116,9 @@ fn encrypt_password() -> Result<(), Box<dyn std::error::Error>> {
         .map_err(|e| format!("Encryption failed: {:?}", e))?;
     let encrypted_base64 = STANDARD.encode(&ciphertext_bytes);
 
-    //println!("Key:  {}", key);
+    println!("Key:  {}", STANDARD.encode(&key));
+    println!("Nonce:  {}", STANDARD.encode(&nonce));
     println!("Encrypted: {}", encrypted_base64);
-
-    print!("Enter base64 encoded string: ");
-    io::stdout().flush().unwrap();
-    let bas64_enc = read_password().unwrap();
-    let decrypted_bytes = cipher 
-        .decrypt(&nonce, STANDARD.decode(&encrypted_base64).unwrap().as_slice())
-        .map_err(|e| format!("Decryption failed: {:?}", e))?;
-    
-    let decrypted_string = String::from_utf8(decrypted_bytes)?;
-    println!("Decrypted: {}", decrypted_string);
-
-
-
-
-    //let encrypted = encrypt_bytes(password.trim_end().as_bytes(), encrypt_key.trim_end().as_bytes()).expect("Failed to encrypt");
-    //println!("{}", String::from_utf8(encrypted).expect("Weird"));
-    //match String::from_utf8(encrypted) {
-    //   Ok(string) => println!("{}", string),
-    //    Err(e) => println!("Error: {}", e),
-    //}
 
     Ok(())
 
@@ -233,6 +245,7 @@ fn main() -> OsshResult<()> {
     let today_naive_date: NaiveDate = now_local.date_naive();
     if args.provide_encrypted_password {
         let _ = encrypt_password();
+        let _ = decrypt_password();
         process::ExitCode::SUCCESS;
         process::exit(1)
     }
