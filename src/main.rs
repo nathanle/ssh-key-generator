@@ -57,24 +57,19 @@ fn get_passwords() -> (String, String) {
 }
 
 fn decrypt_password() -> Result<(), Box<dyn std::error::Error>> {
-    //Cleanup var names here...
     print!("Enter key: ");
     io::stdout().flush().unwrap();
-    let dkey = read_password().unwrap();
-    let decoded_key = STANDARD.decode(&dkey).unwrap();
-    let new = GenericArray::from_slice(&decoded_key);
-    let dcipher = Aes256Gcm::new(&new);
+    let dkey = STANDARD.decode(read_password().unwrap()).unwrap();
+    let dcipher = Aes256Gcm::new(GenericArray::from_slice(&dkey));
 
     print!("Enter nonce: ");
     io::stdout().flush().unwrap();
-    let nnonce = read_password().unwrap();
-    let decoded_nonce = STANDARD.decode(&nnonce).unwrap();
-    let nonce = GenericArray::from_slice(&decoded_nonce);
+    let nnonce = STANDARD.decode(read_password().unwrap()).unwrap();
+    let nonce = GenericArray::from_slice(&nnonce);
 
     print!("Enter base64 encoded string: ");
     io::stdout().flush().unwrap();
-    let base64_enc = read_password().unwrap();
-    let decoded_payload = STANDARD.decode(&base64_enc).unwrap();
+    let decoded_payload = STANDARD.decode(read_password().unwrap()).unwrap();
     
     let decrypted_bytes = dcipher 
         .decrypt(&nonce, decoded_payload.as_slice())
@@ -98,15 +93,6 @@ fn encrypt_password() -> Result<(), Box<dyn std::error::Error>> {
             break;
         }
     }
-    //let key = "ENCRYPTION_KEY";
-    
-    //let encrypt_key = match env::var(key) {
-    //    Ok(value) => value,
-    //    Err(e) => {
-    //        eprintln!("{}", e);
-    //        panic!("Provide ENCRYPTION_KEY env var");
-    //    }
-    //};
 
     let key = Aes256Gcm::generate_key(&mut OsRng);
     let cipher = Aes256Gcm::new(&key);
