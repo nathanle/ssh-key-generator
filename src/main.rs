@@ -4,7 +4,7 @@ extern crate cfg_if;
 use osshkeys::error::OsshResult;
 use osshkeys::{cipher::Cipher, KeyPair, KeyType, PublicKey, PublicParts};
 use osshkeys::keys::FingerprintHash;
-use std::{ env, fs, process };
+use std::{ fs, process };
 use std::io::{self, Write};
 #[cfg(unix)]
 use std::os::unix::fs::*;
@@ -21,7 +21,7 @@ use serde::Deserialize;
 use gethostname::gethostname;
 use aes_gcm::{
     aead::{generic_array::GenericArray, Aead, AeadCore, KeyInit, OsRng},
-    Aes256Gcm, Nonce, Key
+    Aes256Gcm
 };
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 
@@ -232,7 +232,6 @@ fn main() -> OsshResult<()> {
     if args.provide_encrypted_password {
         let _ = encrypt_password();
         let _ = decrypt_password();
-        process::ExitCode::SUCCESS;
         process::exit(1)
     }
 
@@ -315,3 +314,25 @@ fn main() -> OsshResult<()> {
     }
     Ok(())
 }
+
+
+//Unit Testing
+pub fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_add_positive_numbers() {
+        assert_eq!(add(2, 2), 4);
+    }
+
+    #[test]
+    fn test_add_negative_numbers() {
+        assert_eq!(add(-1, -1), -2);
+    }
+}
+
