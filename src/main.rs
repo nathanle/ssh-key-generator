@@ -45,7 +45,7 @@ struct Args {
     #[arg(short, long, action=clap::ArgAction::SetTrue)]
     provide_encrypted_password: bool, 
 }
-// Ask for the password twice and make sure it matches.
+// Ask for the password twice.
 fn get_passwords() -> (String, String) {
     print!("Enter password: ");
     io::stdout().flush().unwrap();
@@ -56,33 +56,8 @@ fn get_passwords() -> (String, String) {
     return (password, password_second);
 }
 
-fn decrypt_password() -> Result<(), Box<dyn std::error::Error>> {
-    print!("Enter key: ");
-    io::stdout().flush().unwrap();
-    let dkey = STANDARD.decode(read_password().unwrap()).unwrap();
-    let dcipher = Aes256Gcm::new(GenericArray::from_slice(&dkey));
-
-    print!("Enter nonce: ");
-    io::stdout().flush().unwrap();
-    let nnonce = STANDARD.decode(read_password().unwrap()).unwrap();
-    let nonce = GenericArray::from_slice(&nnonce);
-
-    print!("Enter base64 encoded string: ");
-    io::stdout().flush().unwrap();
-    let decoded_payload = STANDARD.decode(read_password().unwrap()).unwrap();
-    
-    let decrypted_bytes = dcipher 
-        .decrypt(&nonce, decoded_payload.as_slice())
-        .map_err(|e| format!("Decryption failed: {:?}", e))?;
-    
-    let decrypted_string = String::from_utf8(decrypted_bytes).unwrap();
-    println!("Decrypted: {}", decrypted_string);
-
-    Ok(())
-
-}
-
-fn encrypt_password() -> Result<(), Box<dyn std::error::Error>> {
+// Make sure password matches.
+fn password_match() -> String {
     let mut password;
     let mut p_second;
     loop {
@@ -94,6 +69,31 @@ fn encrypt_password() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    return password
+}
+
+fn decrypt_password<'a>(key: &'a str, input_nonce: &'a str, password: &'a str) -> Result<String, Box<dyn std::error::Error>> {
+    let dkey = STANDARD.decode(key).unwrap();
+    let dcipher = Aes256Gcm::new(GenericArray::from_slice(&dkey));
+
+    let nnonce = STANDARD.decode(input_nonce).unwrap();
+    let nonce = GenericArray::from_slice(&nnonce);
+
+    let decoded_payload = STANDARD.decode(password).unwrap();
+    
+    let decrypted_bytes = dcipher 
+        .decrypt(&nonce, decoded_payload.as_slice())
+        .map_err(|e| format!("Decryption failed: {:?}", e))?;
+    
+    let decrypted_string = String::from_utf8(decrypted_bytes).unwrap();
+    println!("Decrypted: {}", decrypted_string);
+
+    Ok(decrypted_string)
+
+}
+
+fn encrypt_password<'a>(password: &'a str) -> Result<(String, String, String), Box<dyn std::error::Error>> {
+    //let password = password_match();
     let key = Aes256Gcm::generate_key(&mut OsRng);
     let cipher = Aes256Gcm::new(&key);
     let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
@@ -102,15 +102,16 @@ fn encrypt_password() -> Result<(), Box<dyn std::error::Error>> {
         .map_err(|e| format!("Encryption failed: {:?}", e))?;
     let encrypted_base64 = STANDARD.encode(&ciphertext_bytes);
 
-    println!("Key:  {}", STANDARD.encode(&key));
-    println!("Nonce:  {}", STANDARD.encode(&nonce));
+    let enc_key = STANDARD.encode(&key);
+    let enc_nonce = STANDARD.encode(&nonce);
+
+    println!("Key:  {}", enc_key);
+    println!("Nonce:  {}", enc_nonce);
     println!("Encrypted: {}", encrypted_base64);
 
-    Ok(())
+    Ok((enc_key, enc_nonce, encrypted_base64))
 
 }
-
-
 
 // Print the fingerprint and add ":" as a delimiter
 fn print_fingerprint<P: Display + AsRef<Path>>(path: P) -> OsshResult<()> {
@@ -219,6 +220,7 @@ fn copy_key(public_key: &str) -> Result<(), Box<dyn std::error::Error>> {
 
         println!("Public key successfully appended to remote host: {}.", server.name);
     }
+
     Ok(())
 }
 
@@ -229,22 +231,14 @@ fn main() -> OsshResult<()> {
     // Get today's date
     let now_local = Local::now();
     let today_naive_date: NaiveDate = now_local.date_naive();
+
     if args.provide_encrypted_password {
-        let _ = encrypt_password();
-        let _ = decrypt_password();
+        //let _ = encrypt_password();
+        //let _ = decrypt_password();
         process::exit(1)
     }
 
-    let mut password;
-    let mut p_second;
-    loop {
-        (password, p_second) = get_passwords();
-        if password != p_second {
-            println!("Passwords do not match. Try again")
-        } else {
-            break;
-        }
-    }
+    let password = password_match();
     let filename = &args.keytype;    
     let today = today_naive_date.to_string();
     let username = whoami::username();
@@ -279,7 +273,6 @@ fn main() -> OsshResult<()> {
     f.write_all(
         keypair
             .serialize_openssh(Some(&password), Cipher::Aes256_Ctr)?
-            //.serialize_pkcs8(Some(&password))?
             .as_bytes(),
     )?;
     f.sync_all()?;
@@ -315,24 +308,39 @@ fn main() -> OsshResult<()> {
     Ok(())
 }
 
-
 //Unit Testing
-pub fn add(a: i32, b: i32) -> i32 {
-    a + b
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_add_positive_numbers() {
-        assert_eq!(add(2, 2), 4);
+    fn test_password_decrypt() {
+        let result = decrypt_password("ljIH2G1AWl8mjcN4VlNUxUgqalbCPHNi2LV9ZVB59CY=", "atUXpNiw/HD7IWcm", "ReWVxSXvwRbK5N7f4j12P4WUlrg=");
+        match result {
+            Ok(result) => { 
+                assert_eq!(result, "test");
+            }
+            Err(e) => {
+                eprintln!("{}", e);
+            }
+        };
     }
 
     #[test]
-    fn test_add_negative_numbers() {
-        assert_eq!(add(-1, -1), -2);
+    fn test_password_encrypt() {
+        let Ok((key, nonce, enc_password)) = encrypt_password("test")
+            else { 
+                todo!() 
+            };
+        let result = decrypt_password(&key, &nonce, &enc_password);
+        match result {
+            Ok(result) => { 
+                assert_eq!(result, "test");
+            }
+            Err(e) => {
+                eprintln!("{}", e);
+            }
+        };
     }
 }
 
