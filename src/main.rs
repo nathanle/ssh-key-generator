@@ -233,8 +233,8 @@ fn main() -> OsshResult<()> {
     let today_naive_date: NaiveDate = now_local.date_naive();
 
     if args.provide_encrypted_password {
-        //let _ = encrypt_password();
-        //let _ = decrypt_password();
+        let (a, b, c) = encrypt_password("test").expect("Encryption Failed!");
+        let _ = decrypt_password(&a, &b, &c);
         process::exit(1)
     }
 
